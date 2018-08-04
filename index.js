@@ -15,24 +15,73 @@ server.listen(port, () => {
 // Routing
 app.use(express.static(path.join(__dirname, 'public')));
 
-// Chatroom
-
 var numUsers = 0;
+var users = {};
 
 io.on('connection', (socket) => {
   var addedUser = false;
-  // when the client emits 'new message', this listens and executes
-  socket.on('new message', (data) => {
-    console.log('socket.username: ' + socket.username);
-    console.log(data);
+  console.log('a user connected');
 
-    // we tell the client to execute 'new message'
-    socket.broadcast.emit('new message', {
-      username: socket.username,
-      message: data.message
-    });
+  // socket.on('new message', (data, room, name) => {
+  //   console.log(room)
+  //   console.log(room + 'has one message: ' + data)
 
-  });
+  //   socket.to(room).emit('client message', {
+  //     name: name,
+  //     message: data,
+  //   });
+  // })
+
+  //監聽用户發布的聊天内容
+  socket.on('message', function (obj) {
+    //向所有客户端廣播發布的消息
+    var mess = {
+      username: obj.username,
+      msg: obj.msg,
+      // img: obj.img,
+      roomid: obj.room,
+      time: obj.time
+    }
+    console.log(mess.roomid)
+    io.to(mess.roomid).emit('message', mess)
+    console.log(obj.username + '對房' + mess.roomid + '說：' + mess.msg)
+  })
+
+  socket.on('login', (data) => {
+    console.log(data)
+    console.log(data.name + '加入了' + data.roomid)
+
+    socket.name = data.name
+    socket.room = data.roomid
+
+    if (!users[data.roomid]) {
+      users[data.roomid] = {}
+    }
+    users[data.roomid] = data
+    socket.join(data.roomid)
+    io.to(data.roomid).emit('login', users[data.roomid])
+  })
+  socket.on('logout',function (obj) {
+    try{
+      console.log(obj.name + '退出了' + obj.roomid)
+      delete users[obj.roomid]
+      io.to(obj.roomid).emit('logout', users[obj.roomid])
+      socket.leave(obj.roomid)
+    } catch (e) {
+      console.log(e)
+    }
+  })
+
+  socket.on('disconnect', function () {
+    console.log(socket.room, socket.name);
+    if (users[socket.room] && users[socket.room].hasOwnProperty(socket.name)) {
+      delete users[socket.room][socket.name]
+      // 退出聊天室
+      global.logger.info(socket.name + '退出了' + socket.room)
+      socket.leave(socket.roomid)
+      io.to(socket.room).emit('logout', users[socket.room])
+    }
+  })
 
   // when the client emits 'add user', this listens and executes
   socket.on('add user', (username) => {
@@ -41,6 +90,7 @@ io.on('connection', (socket) => {
     // we store the username in the socket session for this client
     socket.username = username;
     ++numUsers;
+    console.log(numUsers);
     addedUser = true;
     socket.emit('login', {
       numUsers: numUsers
@@ -69,17 +119,16 @@ io.on('connection', (socket) => {
     });
   });
 
-  // when the user disconnects.. perform this
-  socket.on('disconnect', () => {
-    console.log('disconnect');
-    if (addedUser) {
-      --numUsers;
+  // socket.on('disconnect', (obj) => {
+  //   console.log('disconnect');
+  //   if (addedUser) {
+  //     --numUsers;
 
-      // echo globally that this client has left
-      socket.broadcast.emit('user left', {
-        username: socket.username,
-        numUsers: numUsers
-      });
-    }
-  });
+  //     // echo globally that this client has left
+  //     socket.broadcast.emit('user left', {
+  //       username: socket.username,
+  //       numUsers: numUsers
+  //     });
+  //   }
+  // });
 });
