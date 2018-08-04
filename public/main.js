@@ -25,6 +25,23 @@ $(function () {
 
   var socket = io();
 
+  // Define event
+  var events = {
+    "newMessage": "new message",
+    "addUser": "add user",
+    "login": "login",
+    "typing": "typing",
+    "stopTyping": "stop typing",
+    "disconnect": "disconnect",
+    "connection": "connection",
+    "userLeft": "user left",
+    "userJoined": "user joined",
+    "customerServiceJoined": "customer service joined",
+    "customerServiceLeft": "customer service left",
+    "pickUp": "pick up",
+    "csConnected": "cs connected"
+  }
+  
   const addParticipantsMessage = (data) => {
     var message = '';
     if (data.numUsers === 1) {
@@ -46,9 +63,110 @@ $(function () {
       $loginPage.off('click');
       $currentInput = $inputMessage.focus();
 
+      //#### get CustomerService User token
+      console.log("customService login")
+      //authCustomerServiceUser("customerService1@gmail.com", "customerService1")
+
+      // {
+      //   "id": "5b4e17e4546347baaf930d8c",
+      //   "name": "曾月青",
+      //   "picture": "https://gravatar.com/avatar/53f08004c8f872af684ba2391f25690f?d=identicon",
+      //   "providerId": "1589453831",
+      //   "email": "customerservice1@gmail.com",
+      //   "createdAt": "2018-07-17T16:23:00.876Z"
+      // }
+      // console.log("AUTH3")
       // Tell the server your username
-      socket.emit('add user', username);
+      //socket.emit('add user', username);
+
+      // data = {
+      //   "userId": data.userId,
+      //   "providerId": data.providerId,
+      //   "customerServiceId": data.customerServiceId,
+      //   "roomId": data.roomId,
+      // }
+
+      // Pick UP
+      socket.emit(events.pickUp, {
+        type: "customerservice",
+        userId: "U7d9b155b96a70afe8607c227b9768677",
+        providerId: "1597108460",
+        customerServiceId: "5b4e17e4546347baaf930d8c",
+        customerServiceName: "曾月青",
+        roomId: "1597108460_U7d9b155b96a70afe8607c227b9768677",
+      })
+
+      // CS Joined
+      socket.emit(events.customerServiceJoined,
+        {
+          type: "customerservice",
+          providerId: "1597108460",
+          userId: "U7d9b155b96a70afe8607c227b9768677",
+          customerServiceId: "5b4e17e4546347baaf930d8c",
+          roomId: "1597108460_U7d9b155b96a70afe8607c227b9768677_5b4e17e4546347baaf930d8c",
+          name: "曾月青",
+          picture: "https://gravatar.com/avatar/53f08004c8f872af684ba2391f25690f?d=identicon"
+        })
+      connected = true;
+      console.log("#####")
     }
+  }
+
+  const authCustomerServiceUser = function (email, password) {
+    var settings = {
+      "async": true,
+      "crossDomain": true,
+      "url": "https://flightgo-backend-dev.herokuapp.com/auth",
+      "method": "POST",
+      "headers": {
+        "Content-Type": "application/json",
+        "Authorization": "Basic Y3VzdG9tZXJTZXJ2aWNlMUBnbWFpbC5jb206Y3VzdG9tZXJTZXJ2aWNlMQ==",
+        "Cache-Control": "no-cache"
+      },
+      "processData": false,
+      "data": "{\"access_token\": \"1gnEhIylRyg3gFe3nXuxhAxZKIbPIZr9\"\n}",
+    }
+
+    $.ajax(settings).done(function (response) {
+      console.log("AAA");
+      console.log(response);
+      token = response.token
+      user = response.user
+      console.log(user)
+      console.log(token)
+      //#### et CustomerService User
+      getCustomServiceUserMe(token)
+      console.log('responseUserMe', responseUserMe)
+    });
+  }
+
+  const getCustomServiceUserMe = function (token) {
+    var settings = {
+      "async": true,
+      "crossDomain": true,
+      "url": "https://flightgo-backend-dev.herokuapp.com/users/me?access_token=" + token,
+      "method": "GET",
+      "headers": {
+        "Content-Type": "application/json",
+      },
+      "processData": false,
+      "data": "{\n\t\"access_token\": \"1gnEhIylRyg3gFe3nXuxhAxZKIbPIZr9\"\n}"
+    }
+
+    $.ajax(settings).done(function (response) {
+      console.log(response);
+      responseUserMe = {
+        id: response.id,
+        name: response.name,
+        providerId: response.providerId
+      }
+      socket.emit('add user', {
+        id: responseUserMe.id,
+        name: responseUserMe.name,
+        providerId: responseUserMe.providerId,
+        roomId: "",
+      });
+    });
   }
 
   // Sends a chat message
@@ -61,21 +179,42 @@ $(function () {
     if (message && connected) {
       $inputMessage.val('');
       addChatMessage({
-        username: username,
+        type: "customerservice",
+        providerId: "1597108460",
+        userId: "U7d9b155b96a70afe8607c227b9768677",
+        customerServiceId: "5b4e17e4546347baaf930d8c",
+        roomId: "1597108460_U7d9b155b96a70afe8607c227b9768677_5b4e17e4546347baaf930d8c",
+        name: "曾月青",
+        picture: "https://gravatar.com/avatar/53f08004c8f872af684ba2391f25690f?d=identicon",
+        username: "曾月青",
         message: message
       });
       // tell server to execute 'new message' and send along one parameter
 
       // socket.emit('new message', message);
-      console.log("TESTEST");
       console.log({
+        type: "customerservice",
         username: username,
         message: message
       })
-      socket.emit('new message', {
-        username: username,
-        message: message
-      }); // be object
+      console.log('SEND MESSAGE')
+      socket.emit(events.newMessage,
+        {
+          type: "customerservice",
+          providerId: "1597108460",
+          userId: "U7d9b155b96a70afe8607c227b9768677",
+          customerServiceId: "5b4e17e4546347baaf930d8c",
+          roomId: "1597108460_U7d9b155b96a70afe8607c227b9768677_5b4e17e4546347baaf930d8c",
+          name: "曾月青",
+          picture: "https://gravatar.com/avatar/53f08004c8f872af684ba2391f25690f?d=identicon",
+          message: message
+        })
+
+      // socket.emit('new message', {
+      //   type: "customerservice",
+      //   username: username,
+      //   message: message
+      // }); // be object
     }
   }
 
@@ -87,6 +226,8 @@ $(function () {
 
   // Adds the visual chat message to the message list
   const addChatMessage = (data, options) => {
+    console.log('addChatMessage', data)
+    
     // Don't fade the message in if there is an 'X was typing'
     var $typingMessages = getTypingMessages(data);
     options = options || {};
@@ -96,14 +237,17 @@ $(function () {
     }
 
     var $usernameDiv = $('<span class="username"/>')
-      .text(data.username)
-      .css('color', getUsernameColor(data.username));
+      // .text(data.username)
+      // .css('color', getUsernameColor(data.username));
+      .text(data.userId)
+      .css('color', getUsernameColor(data.userId));
     var $messageBodyDiv = $('<span class="messageBody">')
       .text(data.message);
 
     var typingClass = data.typing ? 'typing' : '';
     var $messageDiv = $('<li class="message"/>')
-      .data('username', data.username)
+      // .data('username', data.username)
+      .data('username', data.userId)
       .addClass(typingClass)
       .append($usernameDiv, $messageBodyDiv);
 
@@ -189,6 +333,7 @@ $(function () {
 
   // Gets the color of a username through our hash function
   const getUsernameColor = (username) => {
+    console.log('getUsernameColor' , username)
     // Compute hash code
     var hash = 7;
     for (var i = 0; i < username.length; i++) {
@@ -209,7 +354,7 @@ $(function () {
     // When the client hits ENTER on their keyboard
     if (event.which === 13) {
       if (username) {
-        console.log('username' , username);
+        console.log('username', username);
         sendMessage();
         socket.emit('stop typing');
         typing = false;
@@ -249,13 +394,16 @@ $(function () {
   });
 
   // Whenever the server emits 'new message', update the chat body
-  socket.on('new message', (data) => {
+  socket.on(events.newMessage, (data) => {
+    console.log(events.newMessage, data)
     addChatMessage(data);
   });
 
   // Whenever the server emits 'user joined', log it in the chat body
   socket.on('user joined', (data) => {
     log(data.username + ' joined');
+
+    console.log('user joined', data)
     addParticipantsMessage(data);
   });
 
