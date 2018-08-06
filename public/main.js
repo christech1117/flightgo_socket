@@ -28,10 +28,10 @@ $(function () {
   // Define event
   var events = {
     "newMessage": "new message",
-    "addUser": "add user",
-    "login": "login",
-    "typing": "typing",
-    "stopTyping": "stop typing",
+   // "addUser": "add user",
+   // "login": "login",
+  //  "typing": "typing",
+  //  "stopTyping": "stop typing",
     "disconnect": "disconnect",
     "connection": "connection",
     "userLeft": "user left",
@@ -39,7 +39,7 @@ $(function () {
     "customerServiceJoined": "customer service joined",
     "customerServiceLeft": "customer service left",
     "pickUp": "pick up",
-    "csConnected": "cs connected"
+    //"csConnected": "cs connected"
   }
   
   const addParticipantsMessage = (data) => {
@@ -87,12 +87,14 @@ $(function () {
       // }
 
       // Pick UP
-      socket.emit(events.pickUp, {
+      socket.emit(events.pickUp, 
+        {
         type: "customerservice",
         userId: "U7d9b155b96a70afe8607c227b9768677",
         providerId: "1597108460",
         customerServiceId: "5b4e17e4546347baaf930d8c",
         customerServiceName: "曾月青",
+        name:"曾月青",
         roomId: "1597108460_U7d9b155b96a70afe8607c227b9768677",
       })
 
@@ -208,13 +210,7 @@ $(function () {
           name: "曾月青",
           picture: "https://gravatar.com/avatar/53f08004c8f872af684ba2391f25690f?d=identicon",
           message: message
-        })
-
-      // socket.emit('new message', {
-      //   type: "customerservice",
-      //   username: username,
-      //   message: message
-      // }); // be object
+        });
     }
   }
 
@@ -239,15 +235,15 @@ $(function () {
     var $usernameDiv = $('<span class="username"/>')
       // .text(data.username)
       // .css('color', getUsernameColor(data.username));
-      .text(data.userId)
-      .css('color', getUsernameColor(data.userId));
+      .text(data.name)
+      .css('color', getUsernameColor(data.name));
     var $messageBodyDiv = $('<span class="messageBody">')
       .text(data.message);
 
     var typingClass = data.typing ? 'typing' : '';
     var $messageDiv = $('<li class="message"/>')
       // .data('username', data.username)
-      .data('username', data.userId)
+      .data('username', data.name)
       .addClass(typingClass)
       .append($usernameDiv, $messageBodyDiv);
 
