@@ -1,13 +1,7 @@
 // Setup basic express server
 'use strict';
-
 const line = require('@line/bot-sdk');
-// create LINE SDK config from env variables
-const config = {
-  channelAccessToken: "IXZ3MZ1GluvFa+5H7RwfnaZbdK4hMGUTDBLO1UjTronMBupOxqgDsGvZQVx4U93byQ8ZqRht9kP8g0DnMA4Omf5Wx9d6EtNAlDDsrRO6ayqzI+myOWdGOBmAhjgK8BafsdTTVhog1pa5CHGHu37FswdB04t89/1O/w1cDnyilFU=",
-  channelSecret: "1c69eba5b75e97f88fe58423b1607cf9",
-};
-
+const config = require('./lineConfig.js').lineAccoessTokenConfig
 // create LINE SDK client
 const client = new line.Client(config);
 
@@ -128,13 +122,7 @@ function handleEvent(event) {
   });
 
   api.getLineUser(event.source.userId, function (user) {
-    //console.log('user data', user)
-    // if (user.userId in usersManager) {
-    //   console.log('user %s exist ', user.userId)
-    // } else {
-    //   console.log('add new user in user manager')
-    //   usersManager[user.userId] = user
-    // }
+    console.log('user data', user)
     usersManager[user.userId] = user
 
     // console.log('usersManager', usersManager)

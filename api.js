@@ -1,9 +1,7 @@
 // create LINE SDK config from env variables
 var axios = require('axios');
-const config = {
-    channelAccessToken: "IXZ3MZ1GluvFa+5H7RwfnaZbdK4hMGUTDBLO1UjTronMBupOxqgDsGvZQVx4U93byQ8ZqRht9kP8g0DnMA4Omf5Wx9d6EtNAlDDsrRO6ayqzI+myOWdGOBmAhjgK8BafsdTTVhog1pa5CHGHu37FswdB04t89/1O/w1cDnyilFU=",
-    channelSecret: "1c69eba5b75e97f88fe58423b1607cf9",
-};
+
+const config = require('./lineConfig.js').lineAccoessTokenConfig
 // create LINE SDK client
 const line = require('@line/bot-sdk');
 const client = new line.Client(config);
@@ -20,6 +18,8 @@ module.exports.updateBotModeByUserId = function (userId, body, callback) {
         });
 }
 module.exports.sendPushMessage = function (token, userId, msg, customerServiceName) {
+    console.log('sendPushMessage token',token)
+    console.log('sendPushMessage userId',userId)
     const client = new line.Client({
         channelAccessToken: token
     });
