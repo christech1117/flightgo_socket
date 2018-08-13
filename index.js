@@ -18,11 +18,18 @@ var server = require('http').createServer(app);
 var io = require('socket.io')(server);
 var port = process.env.PORT || 3001;
 var request = require('request');
-server.listen(3001);
+var axios = require('axios');
 
+var logging = require('./logging.js')
+var api = require('./api.js')
+
+server.listen(3001);
 server.listen(port, () => {
   console.log('Server listening at port %d', port);
 });
+
+// enable debug log
+logging.enableDebug(false)
 
 // Routing
 app.use(express.static(path.join(__dirname, 'public')));
@@ -46,7 +53,8 @@ var events = {
   "userJoined": "user joined",
   "customerServiceJoined": "customer service joined",
   "customerServiceLeft": "customer service left",
-  "pickUp": "pick up"
+  "pickUp": "pick up",
+  "resumeBotMode": "resume bot mode"
 }
 
 // register a webhook handler with middleware
@@ -60,117 +68,159 @@ app.post('/callback', line.middleware(config), (req, res) => {
       res.status(500).end();
     });
 });
+
+var usersManager = {};
+var chatRoomManager = {}
 var socketClient = require('socket.io-client')('http://localhost:3001');
-var isBotMode = true;
 
 // event handler
 function handleEvent(event) {
-  // console.log("HANDLE EVENT", event)
-  if (event.type !== 'message' || event.message.type !== 'text') {
-    // ignore non-text-message event
-    return Promise.resolve(null);
-  }
+  logging.log('event', event)
+
+  // listener
   socketClient.on(events.newMessage, function (data) {
-    console.log('[%s]on newMessage...', socketClient.id);
+    console.log('[socketClient] on newMessage...', data);
     const channelId = data.providerId // line provider's ID
-    let token = providerTokensManager[channelId]
-    let userId = data.userId
-    let msg = data.message;
-    let csName = data.customerServiceName
-    sendPushMessage(token, userId, msg, csName)
+    const token = providerTokensManager[channelId]
+    const userId = data.userId
+    const msg = data.message;
+    const csName = data.customerServiceName
+    api.sendPushMessage(token, userId, msg, csName)
   });
-  
+
+  socketClient.on(events.pickUp, function (data) {
+    console.log('[socketClient] on pickUp...', data);
+  });
+
   socketClient.on(events.disconnect, function () {
-    console.log('[%s]on disconnect...', socketClient.id);
+    console.log('[socketClient]  [%s]on disconnect...', socketClient.id);
   });
 
   socketClient.on(events.connection, function () {
-    console.log('[%s]on connection...', socketClient.id);
+    console.log(' [socketClient]  on connection...');
   });
 
   socketClient.on(events.userLeft, function () {
-    console.log('[%s]on userLeft...', socketClient.id);
+    console.log('[socketClient] [%s] on userLeft...', socketClient.id);
   });
 
-  socketClient.on(events.userJoined, function (data) {
-    console.log('[%s]on userJoined...', socketClient.id);
+  socketClient.on(events.userJoined, function (user) {
+    console.log('[socketClient] [%s] on userJoined...', socketClient.id);
+    console.log('[socketClient] on userJoined...', user);
 
+    // add this user new chat room id to chatRoomManager
+    chatRoomManager[user.userId] = {
+      userId: user.userId,
+      customerServiceId :user.customerServiceId,
+      chatRoomId: user.chatRoomId,
+    }
+    
     //user join a new room id
-    socketClient.emit(events.userJoined, data);
+    socketClient.emit(events.userJoined, user);
   });
 
   socketClient.on(events.pickUp, function () {
-    console.log('[%s]on pickUp...', socketClient.id);
+    console.log('[socketClient] on pickUp...');
   });
-  //userId: 'U7d9b155b96a70afe8607c227b9768677, jackal
-  //userId: 'Ucbd48498cf2763c248f367837b5d6d9a , yi ching
-  if (isBotMode) {
-    console.log('BOT模式', event.message.text);
-    if (event.message.text == "客服") {
-      console.log(event.message.text);
-      //=========
-      // CLIENT SIDE
-      //=========
-      socketClient.emit(events.userJoined,
-        {
-          type: "user",
-          providerId: "1597108460",
-          userId: "U7d9b155b96a70afe8607c227b9768677",
-          customerServiceId: "Unknow",
-          roomId: "1597108460_U7d9b155b96a70afe8607c227b9768677"
-        });
-      isBotMode = false
-      return client.replyMessage(event.replyToken, { type: 'text', text: "轉接客服中.." });
+
+  socketClient.on(events.disconnect, function () {
+    console.log('[socketClient] on disconnect...');
+  });
+
+  api.getLineUser(event.source.userId, function (user) {
+    //console.log('user data', user)
+    // if (user.userId in usersManager) {
+    //   console.log('user %s exist ', user.userId)
+    // } else {
+    //   console.log('add new user in user manager')
+    //   usersManager[user.userId] = user
+    // }
+    usersManager[user.userId] = user
+
+    // console.log('usersManager', usersManager)
+    if (event.type !== 'message' || event.message.type !== 'text') {
+      // ignore non-text-messageuser event
+      return Promise.resolve(null);
+    }
+
+    //userId: 'U7d9b155b96a70afe8607c227b9768677, jackal
+    //userId: 'Ucbd48498cf2763c248f367837b5d6d9a , yi ching
+    if (usersManager[user.userId].isBotMode) {
+      console.log('BOT模式 message:', event.message.text);
+      switch (event.message.text) {
+        case "客服":
+        case "請求客服":
+          user.type = "user"
+          socketClient.emit(events.userJoined, user);
+          return client.replyMessage(event.replyToken, { type: 'text', text: "轉接客服中.." });
+        default:
+          // ECHO
+          return client.replyMessage(event.replyToken, { type: 'text', text: event.message.text });
+      }
     } else {
-      return client.replyMessage(event.replyToken, { type: 'text', text: event.message.text });
+      console.log('客服模式 message:', event.message.text);
+      switch (event.message.text) {
+        case "斷線":
+        case "離開":
+        case "結束":
+        case "結束客服":
+          // disconnect this user
+          socketClient.emit(events.userLeft, user);
+          break;
+        default:
+          // console.log('userManager [%s]', user.userId)
+          console.log('chatRoomManager:', chatRoomManager[user.userId])
+        
+          //SEND MESSAGE TO CUSTOMER SERVICE
+          socketClient.emit(events.newMessage,
+            {
+              type: "user",
+              providerId: user.providerId,
+              userId: user.userId,
+              customerServiceId: chatRoomManager[user.userId],
+              chatRoomId: chatRoomManager[user.userId].chatRoomId,
+              name: user.name,
+              message: event.message.text
+            });
+      }
     }
-  } else {
-    console.log('客服模式', event.message.text);
-    switch (event.message.text) {
-      case "斷線":
-        // disconnect this user
-        isBotMode = true
-        break;
-      default:
-        socketClient.emit(events.newMessage,
-          {
-            type: "user",
-            providerId: "1597108460",
-            userId: "U7d9b155b96a70afe8607c227b9768677",
-            customerServiceId: "5b4e17e4546347baaf930d8c",
-            roomId: "1597108460_U7d9b155b96a70afe8607c227b9768677_5b4e17e4546347baaf930d8c",
-            name: "U7d9b155b96a70afe8607c227b9768677",
-            message: event.message.text
-          });
-    }
-  }
+  });
 }
 
 //=========
 // SERVER SIDE
 //=========
 io.sockets.on('connection', function (socket) {
-  // {
-  //   type: "user",
-  //   providerId: "1597108460",
-  //   userId: "U7d9b155b96a70afe8607c227b9768677",
-  //   userNmae:""
-  //   customerServiceId: "Unknow",
-  //   roomId: "1597108460_U7d9b155b96a70afe8607c227b9768677"
-  // }
   socket.on(events.userJoined, function (data) {
-    console.log('*** [%s]User joining [%s] room', socket.id, data.roomId);
-    socket.join(data.roomId);
+    console.log('*** [%s]User joining [%s] room', socket.id, data.chatRoomId);
+    socket.join(data.chatRoomId);
+    api.updateBotModeByUserId(data.userId, { isBotMode: false }, function (res) { })
+  });
+
+  socket.on(events.userLeft, function (data) {
+    console.log('*** [%s]User leaving [%s] room', socket.id, data.chatRoomId);
+
+    data.message = "您已離開客服模式，若需要客服，請輸入[客服]"
+    io.in(data.chatRoomId).emit(events.newMessage, data);
+
+    socket.leave(data.chatRoomId);
+    api.updateBotModeByUserId(data.userId, { isBotMode: true }, function (res) { })
+
   });
 
   socket.on(events.customerServiceJoined, function (data) {
-    console.log('*** [%s] CS joining [%s] room', socket.id, data.roomId);
-    socket.join(data.roomId); //3 ids
+    console.log('*** [%s] CS joining [%s] room', socket.id, data.chatRoomId);
+    console.log('*** CS joining ', data);
+    socket.join(data.chatRoomId); //3 ids
+
+    //socket.to(data.chatRoomId).emit('test', "let's play a game");
+    //socket.to(getOldRoomId(data.chatRoomId)).emit('test', "let's play a game2222");
+    //socket.broadcast.to(getOldRoomId(data.chatRoomId)).emit('test', {"A":1});
   });
 
   socket.on(events.customerServiceLeft, function (data) {
-    console.log('*** [%s] CS leaving [%s] room', socket.id, data.roomId);
-    socket.leave(data.roomId);
+    console.log('*** [%s] CS leaving [%s] room', socket.id, data.chatRoomId);
+    socket.leave(data.chatRoomId);
   });
 
   //FORMAT
@@ -180,39 +230,43 @@ io.sockets.on('connection', function (socket) {
   // userId: "U7d9b155b96a70afe8607c227b9768677",
   // customerServiceId: "5b4e17e4546347baaf930d8c",
   // customerServiceName: "曾月青",
-  // roomId: "1597108460_U7d9b155b96a70afe8607c227b9768677_5b4e17e4546347baaf930d8c",
+  // chatRoomId: "1597108460_U7d9b155b96a70afe8607c227b9768677_5b4e17e4546347baaf930d8c",
   // picture: "https://gravatar.com/avatar/53f08004c8f872af684ba2391f25690f?d=identicon",
   // message: message
   // }
   socket.on(events.newMessage, function (data) {
-    console.log('sending message', data.roomId);
+    console.log('sending message', data.chatRoomId);
     if (data.type == "user") {
-      //io.to(data.roomId).emit(events.newMessage, data);
-      socket.broadcast.to(data.roomId).emit(events.newMessage, data);
+      //io.to(data.chatRoomId).emit(events.newMessage, data);
+      socket.broadcast.to(data.chatRoomId).emit(events.newMessage, data);
     } else if (data.type == "customerservice") {
-      //io.to(data.roomId).emit(events.newMessage, data);
-      //socket.broadcast.to(data.roomId).emit(events.newMessage, data);
-      io.in(data.roomId).emit(events.newMessage, data);
+      // io.to(data.chatRoomId).emit(events.newMessage, data);
+      socket.broadcast.to(data.chatRoomId).emit(events.newMessage, data);
+      // io.in(data.chatRoomId).emit(events.newMessage, data);
     }
     //save db
+
   });
 
   socket.on(events.pickUp, function (data) {
     // sending to all clients in 'data.room' room(channel), include sender
     console.log(events.pickUp);
+    // console.log('PICK UP' ,data)
     data.message = "客服已連線"
-    io.in(data.roomId).emit(events.newMessage, data);
+    io.in(data.chatRoomId).emit(events.newMessage, data);
 
-    
     // create new roomId 3 ids
-    const newRoomId = data.roomId + "_" + data.customerServiceId
+    const newRoomId = data.chatRoomId + "_" + data.customerServiceId
     data = {
       providerId: data.providerId,
       userId: data.userId,
       customerServiceId: data.customerServiceId,
-      roomId: newRoomId
+      chatRoomId: newRoomId
     }
-    socket.emit(events.customerServiceJoined, data);
+
+    //TODO check is new chat room exist
+
+    //TODO if not exist, create new, otherwise don't create again
     createNewChatRoom(data)
   });
 });
@@ -227,19 +281,20 @@ var createNewChatRoom = function (data) {
       'Cache-Control': 'no-cache',
       'Content-Type': 'application/json'
     },
-    body: { providerId: data.providerId, userId: data.userId, customerServiceId: data.customerServiceId, roomId: data.roomId },
+    body: { providerId: data.providerId, userId: data.userId, customerServiceId: data.customerServiceId, roomId: data.chatRoomId },
     json: true
   };
 
   request(options, function (error, response, body) {
     if (error) throw new Error(error);
 
-    io.to(getOldRoomId(data.roomId)).emit(events.userJoined, {
+    // notify user to jonin new chat room (3 ID)
+    io.to(getOldRoomId(data.chatRoomId)).emit(events.userJoined, {
       type: "user",
       providerId: data.providerId,
       userId: data.userId,
       customerServiceId: data.customerServiceId,
-      roomId: data.roomId,
+      chatRoomId: data.chatRoomId,
       name: "",
       picture: "https://gravatar.com/avatar/53f08004c8f872af684ba2391f25690f?d=identicon"
     });
@@ -256,22 +311,8 @@ var getOldRoomId = function (newRoomId) {
   return oldRoomId
 }
 
-
-const sendPushMessage = function (token, userId, msg, customerServiceName) {
-  const client = new line.Client({
-    channelAccessToken: token
+const getProfile = function (userId) {
+  client.getProfile(userId).then((profile) => {
+    console.log('profile', profile)
   });
-  const message = {
-    type: 'text',
-    text: customerServiceName + ":\n" + msg
-  }
-
-  client.pushMessage(userId, message)
-    .then(() => {
-      console.log('sent message success')
-    })
-    .catch((err) => {
-      // error handling
-      console.log('sent message failed', err)
-    });
 }
