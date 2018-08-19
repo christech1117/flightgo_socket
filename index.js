@@ -23,7 +23,7 @@ server.listen(port, () => {
 });
 
 // enable debug log
-logging.enableDebug(false)
+logging.enableDebug(true)
 
 // Routing
 app.use(express.static(path.join(__dirname, 'public')));
@@ -71,6 +71,35 @@ var socketClient = require('socket.io-client')('http://localhost:3001');
 function handleEvent(event) {
   logging.log('event', event)
 
+  switch (event.type) {
+    case "follow":
+      followEvent(event)
+      break;
+
+    case "unfollow":
+      unfollowEvent(event)
+      break;
+
+    case "message":
+      messageEvent(event)
+      break;
+
+  }
+}
+
+function followEvent(event) {
+  console.log('followEvent')
+  // create user
+  api.createLineUser(event.source.userId, function (user) {
+    return client.replyMessage(event.replyToken, { type: 'text', text: user.name + " 歡迎加入Flightgo" });
+  })
+}
+
+function unfollowEvent(event) {
+  console.log(event.source.userId + " 離開")
+}
+
+function messageEvent(event) {
   // listener
   socketClient.on(events.newMessage, function (data) {
     console.log('[socketClient] on newMessage...', data);
@@ -79,6 +108,9 @@ function handleEvent(event) {
     const userId = data.userId
     const msg = data.message;
     const csName = data.customerServiceName
+    console.log('MESSAGE T:%s', token, )
+    console.log('MESSAGE U:%s', userId)
+    console.log('MESSAGE C:%s', channelId)
     api.sendPushMessage(token, userId, msg, csName)
   });
 
@@ -105,10 +137,10 @@ function handleEvent(event) {
     // add this user new chat room id to chatRoomManager
     chatRoomManager[user.userId] = {
       userId: user.userId,
-      customerServiceId :user.customerServiceId,
+      customerServiceId: user.customerServiceId,
       chatRoomId: user.chatRoomId,
     }
-    
+
     //user join a new room id
     socketClient.emit(events.userJoined, user);
   });
@@ -158,7 +190,7 @@ function handleEvent(event) {
         default:
           // console.log('userManager [%s]', user.userId)
           console.log('chatRoomManager:', chatRoomManager[user.userId])
-        
+
           //SEND MESSAGE TO CUSTOMER SERVICE
           socketClient.emit(events.newMessage,
             {
@@ -297,10 +329,4 @@ var getOldRoomId = function (newRoomId) {
   const oldRoomId = sp[0] + "_" + sp[1]
   console.log('oldRoomId', oldRoomId)
   return oldRoomId
-}
-
-const getProfile = function (userId) {
-  client.getProfile(userId).then((profile) => {
-    console.log('profile', profile)
-  });
 }
