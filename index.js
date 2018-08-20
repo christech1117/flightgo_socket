@@ -17,7 +17,6 @@ var axios = require('axios');
 var logging = require('./logging.js')
 var api = require('./api.js')
 
-server.listen(3001);
 server.listen(port, () => {
   console.log('Server listening at port %d', port);
 });
@@ -108,9 +107,6 @@ function messageEvent(event) {
     const userId = data.userId
     const msg = data.message;
     const csName = data.customerServiceName
-    console.log('MESSAGE T:%s', token, )
-    console.log('MESSAGE U:%s', userId)
-    console.log('MESSAGE C:%s', channelId)
     api.sendPushMessage(token, userId, msg, csName)
   });
 
@@ -206,7 +202,6 @@ function messageEvent(event) {
     }
   });
 }
-
 //=========
 // SERVER SIDE
 //=========
@@ -292,10 +287,12 @@ io.sockets.on('connection', function (socket) {
 });
 
 var createNewChatRoom = function (data) {
+  console.log('createNewChatRoom',api.server)
   var request = require("request");
   var options = {
     method: 'POST',
-    url: 'https://flightgo-backend-dev.herokuapp.com/chatrooms',
+    // url: 'https://flightgo-backend-dev.herokuapp.com/chatrooms',
+    url: api.server + '/chatrooms',
     headers:
     {
       'Cache-Control': 'no-cache',

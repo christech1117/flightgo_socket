@@ -9,6 +9,7 @@ const client = new line.Client(config);
 const server = "https://www.flightgoai-service.com:9002"
 
 module.exports = {}
+module.exports.server = server
 module.exports.updateBotModeByUserId = function (userId, body, callback) {
     axios.put(server + '/lineusers/userid/' + userId, {
         isBotMode: body.isBotMode
@@ -31,6 +32,7 @@ module.exports.getLineUserProfile = function (userId, callback) {
 module.exports.createLineUser = function (userId, callback) {
     this.getLineUserProfile(userId, function (profile) {
         console.log("createLineUser", profile)
+        console.log("this.server:", server)
         axios.post(server + '/lineusers/', {
             userId: userId,
             name: profile.displayName,
@@ -52,7 +54,7 @@ module.exports.createLineUser = function (userId, callback) {
     });
 }
 module.exports.getLineUser = function (userId, callback) {
-    axios.get(server + '/lineusers/userid/' + userId, {
+    axios.get(this.server + '/lineusers/userid/' + userId, {
         params: {}
     })
         .then(function (response) {
