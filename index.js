@@ -33,7 +33,6 @@ var providerTokensManager = {
   "1589453831": "9BCweAdC1k5sE+h6cOsEEFlqt5AnCyHbmMkjh5Tx3DvGYMCN6XS+pG2E+1o4i/3Z0EbsbGzIOcmQH7o+UguZr42KsEqwCP0kNb1C0A+jPCRraX8Iv5po87utrmgv5KqdA9kzjn1fSyTDkDzlmQk4hQdB04t89/1O/w1cDnyilFU=",
   "1580838292": "O3kDD5t80yC4I8bCWHUsp0DRRm2ZVl/Y5n2mBKczD4bIxbedCF8CA2B6fSNu0/12jO5k0wbp8etkBa6HVwb6T2a5jCQOOMKovAqq7dbJ0hTUoxfez+u5scFr5xWrH2hjxmu9ZcjKmrK7x9alXFSiTgdB04t89/1O/w1cDnyilFU=",
   "1592656329": "dkpCfOzBlR0Y30KQgtq8hPr06jhr6GV9Ijjvypvzauc/ko/g7YIb49NfE2iLI3dOC3guoASI02XjozS4ZQQK0xE+FDr1Cxy7zhpaQgcp+WcelhfeMfnj6mO6WiqXQ4ZB/OPqBLnc8OzM0mkUKPOpcgdB04t89/1O/w1cDnyilFU=",
-
   "1597108460": "IXZ3MZ1GluvFa+5H7RwfnaZbdK4hMGUTDBLO1UjTronMBupOxqgDsGvZQVx4U93byQ8ZqRht9kP8g0DnMA4Omf5Wx9d6EtNAlDDsrRO6ayqzI+myOWdGOBmAhjgK8BafsdTTVhog1pa5CHGHu37FswdB04t89/1O/w1cDnyilFU="
 }
 // Define event
@@ -91,7 +90,10 @@ function followEvent(event) {
   console.log('followEvent')
   // create user
   api.createLineUser(event.source.userId, function (user) {
-    return client.replyMessage(event.replyToken, { type: 'text', text: user.name + " 歡迎加入Flightgo" });
+    return client.replyMessage(event.replyToken, {
+      type: 'text',
+      text: user.name + " 歡迎加入Flightgo"
+    });
   })
 }
 
@@ -172,10 +174,16 @@ function messageEvent(event) {
         case "請求客服":
           user.type = "user"
           socketClient.emit(events.userJoined, user);
-          return client.replyMessage(event.replyToken, { type: 'text', text: "轉接客服中.." });
+          return client.replyMessage(event.replyToken, {
+            type: 'text',
+            text: "轉接客服中.."
+          });
         default:
           // ECHO
-          return client.replyMessage(event.replyToken, { type: 'text', text: event.message.text });
+          return client.replyMessage(event.replyToken, {
+            type: 'text',
+            text: event.message.text
+          });
       }
     } else {
       console.log('客服模式 message:', event.message.text);
@@ -192,16 +200,15 @@ function messageEvent(event) {
           console.log('chatRoomManager:', chatRoomManager[user.userId])
 
           //SEND MESSAGE TO CUSTOMER SERVICE
-          socketClient.emit(events.newMessage,
-            {
-              type: "user",
-              providerId: user.providerId,
-              userId: user.userId,
-              customerServiceId: chatRoomManager[user.userId],
-              chatRoomId: chatRoomManager[user.userId].chatRoomId,
-              name: user.name,
-              message: event.message.text
-            });
+          socketClient.emit(events.newMessage, {
+            type: "user",
+            providerId: user.providerId,
+            userId: user.userId,
+            customerServiceId: chatRoomManager[user.userId],
+            chatRoomId: chatRoomManager[user.userId].chatRoomId,
+            name: user.name,
+            message: event.message.text
+          });
       }
     }
   });
@@ -214,7 +221,9 @@ io.sockets.on('connection', function (socket) {
   socket.on(events.userJoined, function (data) {
     console.log('*** [%s]User joining [%s] room', socket.id, data.chatRoomId);
     socket.join(data.chatRoomId);
-    api.updateBotModeByUserId(data.userId, { isBotMode: false }, function (res) { })
+    api.updateBotModeByUserId(data.userId, {
+      isBotMode: false
+    }, function (res) {})
   });
 
   socket.on(events.userLeft, function (data) {
@@ -224,14 +233,16 @@ io.sockets.on('connection', function (socket) {
     io.in(data.chatRoomId).emit(events.newMessage, data);
 
     socket.leave(data.chatRoomId);
-    api.updateBotModeByUserId(data.userId, { isBotMode: true }, function (res) { })
+    api.updateBotModeByUserId(data.userId, {
+      isBotMode: true
+    }, function (res) {})
 
   });
 
   socket.on(events.customerServiceJoined, function (data) {
-    console.log('*** [%s] CS joining [%s] room', socket.id, data.chatRoomId);
-    console.log('*** CS joining ', data);
-    socket.join(data.chatRoomId); //3 ids
+    const newRoomId = data.chatRoomId + "_" + data.customerServiceId
+    console.log('*** [%s] CS joining [%s] room', socket.id, newRoomId)
+    socket.join(newRoomId)
 
     //socket.to(data.chatRoomId).emit('test', "let's play a game");
     //socket.to(getOldRoomId(data.chatRoomId)).emit('test', "let's play a game2222");
@@ -260,8 +271,8 @@ io.sockets.on('connection', function (socket) {
       //io.to(data.chatRoomId).emit(events.newMessage, data);
       socket.broadcast.to(data.chatRoomId).emit(events.newMessage, data);
     } else if (data.type == "customerservice") {
-      // io.to(data.chatRoomId).emit(events.newMessage, data);
-      socket.broadcast.to(data.chatRoomId).emit(events.newMessage, data);
+      io.to(data.chatRoomId).emit(events.newMessage, data);
+      // socket.broadcast.to(data.chatRoomId).emit(events.newMessage, data);
       // io.in(data.chatRoomId).emit(events.newMessage, data);
     }
     //save db
@@ -296,12 +307,16 @@ var createNewChatRoom = function (data) {
   var options = {
     method: 'POST',
     url: 'https://flightgo-backend-dev.herokuapp.com/chatrooms',
-    headers:
-    {
+    headers: {
       'Cache-Control': 'no-cache',
       'Content-Type': 'application/json'
     },
-    body: { providerId: data.providerId, userId: data.userId, customerServiceId: data.customerServiceId, roomId: data.chatRoomId },
+    body: {
+      providerId: data.providerId,
+      userId: data.userId,
+      customerServiceId: data.customerServiceId,
+      roomId: data.chatRoomId
+    },
     json: true
   };
 
